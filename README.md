@@ -61,7 +61,41 @@ Casdoor's initial admin password must be supplied as a runtime secret before ini
 
 ## CI/CD
 
-_To be completed in later steps._
+GitLab CI uses Buildah, and GitHub Actions uses Docker Buildx. Both pipelines validate and test changes before building images, and publish images to both registries for version tags.
+
+| Event | GitLab CI | GitHub Actions |
+|---|---|---|
+| Pull request / merge request | lint, typecheck, test, build (no push) | same |
+| Push to `main` | lint, typecheck, test, build (no push) | same |
+| Tag `v*.*.*` | lint, typecheck, test, publish | same |
+
+Published image paths:
+
+- GHCR: `ghcr.io/jalau-labs/sd4-week-08-auth-api`
+- GitLab Registry: `registry.gitlab.com/jala-university1/cohort-5/es.cssd-245.ga.t2.26.m2/sd/group-b/individual-laboratories/alejandro-botina/week-08/sd4-week-08-auth-api`
+
+Each version tag publishes `{version}` and `{version}-{sha}` tags. The `latest` tag is published only for stable versions without a `-` suffix; pre-release versions do not update `latest`.
+
+Configure these credentials:
+
+- GitLab CI/CD variables: `GHCR_USER`, `GHCR_TOKEN`
+- GitHub repository secrets: `GITLAB_DEPLOY_USER`, `GITLAB_DEPLOY_TOKEN`
+
+GitHub Actions uses its built-in `GITHUB_TOKEN` to publish to GHCR.
+
+To cut a release:
+
+```fish
+git tag -a v0.1.0 -m "Release v0.1.0"
+git push origin v0.1.0
+```
+
+To consume a published image:
+
+```fish
+docker pull ghcr.io/jalau-labs/sd4-week-08-auth-api:v0.1.0
+docker run --rm -p 8080:80 ghcr.io/jalau-labs/sd4-week-08-auth-api:v0.1.0
+```
 
 ## Deployment
 
