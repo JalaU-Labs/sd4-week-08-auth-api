@@ -1,5 +1,11 @@
 {
-  "organizations": [],
+  "organizations": [
+    {
+      "owner": "admin",
+      "name": "built-in",
+      "displayName": "Built-in Organization"
+    }
+  ],
   "applications": [
     {
       "owner": "admin",
@@ -7,7 +13,7 @@
       "displayName": "SD4 Auth API",
       "logo": "",
       "homepageUrl": "",
-      "organization": "",
+      "organization": "built-in",
       "cert": "",
       "enablePassword": true,
       "enableSignUp": true,
@@ -100,7 +106,7 @@
         "authorization_code"
       ],
       "redirectUris": [
-        "https://sd4-week-08-auth-api.onrender.com/auth/casdoor/callback"
+        "__CASDOOR_REDIRECT_URI__"
       ],
       "tokenFormat": "JWT",
       "tokenFields": [],

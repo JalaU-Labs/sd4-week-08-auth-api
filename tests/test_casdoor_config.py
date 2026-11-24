@@ -12,11 +12,10 @@ def test_init_data_template_defines_casdoor_oidc_application() -> None:
     init_data = json.loads(INIT_DATA_TEMPLATE.read_text())
     application = next(item for item in init_data["applications"] if item["name"] == "sd4-auth-api")
 
+    assert application["organization"] == "built-in"
     assert application["clientId"] == "__CASDOOR_CLIENT_ID__"
     assert application["clientSecret"] == "__CASDOOR_CLIENT_SECRET__"
-    assert application["redirectUris"] == [
-        "https://sd4-week-08-auth-api.onrender.com/auth/casdoor/callback"
-    ]
+    assert application["redirectUris"] == ["__CASDOOR_REDIRECT_URI__"]
     assert application["grantTypes"] == ["authorization_code"]
     assert application["tokenFormat"] == "JWT"
     assert application["isEnabled"] is True
