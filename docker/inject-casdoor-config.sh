@@ -36,3 +36,5 @@ replace_placeholder "$CASDOOR_INIT_DATA_PATH" \
     "__CASDOOR_CLIENT_ID__" "$(escape_json_string "${CASDOOR_CLIENT_ID:-}")"
 replace_placeholder "$CASDOOR_INIT_DATA_PATH" \
     "__CASDOOR_CLIENT_SECRET__" "$(escape_json_string "${CASDOOR_CLIENT_SECRET:-}")"
+replace_placeholder "$CASDOOR_INIT_DATA_PATH" \
+    "__CASDOOR_REDIRECT_URI__" "$(escape_json_string "${CASDOOR_REDIRECT_URI:-}")"

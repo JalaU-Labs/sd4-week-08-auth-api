@@ -33,16 +33,19 @@ def test_config_injector_substitutes_credentials_without_printing_them(
             {
                 "clientId": "__CASDOOR_CLIENT_ID__",
                 "clientSecret": "__CASDOOR_CLIENT_SECRET__",
+                "redirectUris": ["__CASDOOR_REDIRECT_URI__"],
             }
         )
     )
     admin_password = "admin/with&special|chars\\"
     client_secret = 'secret/with&special|chars\\"'
+    redirect_uri = "http://localhost:8080/auth/casdoor/callback?source=local&flow=oidc"
     environment = {
         **os.environ,
         "CASDOOR_ADMIN_PASSWORD": admin_password,
         "CASDOOR_CLIENT_ID": "sd4-week-08-auth-api-client",
         "CASDOOR_CLIENT_SECRET": client_secret,
+        "CASDOOR_REDIRECT_URI": redirect_uri,
         "CASDOOR_CONFIG_PATH": str(casdoor_config),
         "CASDOOR_INIT_DATA_TEMPLATE_PATH": str(init_data_template),
         "CASDOOR_INIT_DATA_PATH": str(init_data_output),
@@ -62,6 +65,7 @@ def test_config_injector_substitutes_credentials_without_printing_them(
     assert rendered_init_data == {
         "clientId": "sd4-week-08-auth-api-client",
         "clientSecret": client_secret,
+        "redirectUris": [redirect_uri],
     }
     assert admin_password not in result.stdout + result.stderr
     assert client_secret not in result.stdout + result.stderr
