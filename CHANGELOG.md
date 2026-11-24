@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] - 2026-11-24
+
+### Fixed
+- Added the built-in Casdoor organization and associated the SSO application with it.
+- Made the Casdoor application's redirect URI dynamic and injected it from configuration.
+- Routed Casdoor's token exchange to the correct internal endpoint for local and Render deployments.
+- Allowed Casdoor ID tokens without `preferred_username` to derive a username from the name or email claim.
+- Preserved OAuth `state` URL encoding and callback decoding.
+
+### Changed
+- Added safe callback diagnostics for token exchange, ID token validation, and user provisioning failures.
+- Disabled request access logs so OAuth codes are not written to container logs.
+
 ## [0.1.5] - 2026-11-24
 
 ### Fixed
