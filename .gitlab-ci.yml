@@ -1,0 +1,116 @@
+stages:
+  - validate
+  - test
+  - build
+  - publish
+
+variables:
+  UV_CACHE_DIR: "$CI_PROJECT_DIR/.cache/uv"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  STORAGE_DRIVER: vfs
+  BUILDAH_ISOLATION: chroot
+
+default:
+  image: python:3.13-slim
+  cache:
+    key: "$CI_COMMIT_REF_SLUG"
+    paths:
+      - .cache/uv/
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/
+
+.lint_template: &lint_base
+  before_script:
+    - pip install --quiet uv
+    - uv sync --frozen
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+lint:
+  stage: validate
+  <<: *lint_base
+  script:
+    - uv run ruff check .
+    - uv run ruff format --check .
+
+typecheck:
+  stage: validate
+  <<: *lint_base
+  script:
+    - uv run mypy src
+
+test:
+  stage: test
+  <<: *lint_base
+  script:
+    - uv run pytest --cov=sd4_week_08_auth_api --cov-report=term-missing --cov-report=xml
+  coverage: '/^TOTAL.+?(\d+(?:\.\d+)?%)$/'
+  artifacts:
+    when: always
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - coverage.xml
+
+build:
+  stage: build
+  image: quay.io/buildah/stable:v1.35
+  variables:
+    STORAGE_DRIVER: vfs
+    BUILDAH_ISOLATION: chroot
+  script:
+    - buildah bud --platform linux/amd64 -t sd4-week-08-auth-api:ci .
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+publish:
+  stage: publish
+  image: quay.io/buildah/stable:v1.35
+  variables:
+    STORAGE_DRIVER: vfs
+    BUILDAH_ISOLATION: chroot
+    GITLAB_IMAGE: "$CI_REGISTRY_IMAGE"
+    GHCR_IMAGE: "ghcr.io/jalau-labs/sd4-week-08-auth-api"
+  before_script:
+    - echo "$CI_JOB_TOKEN" | buildah login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - echo "$GHCR_TOKEN" | buildah login -u "$GHCR_USER" --password-stdin ghcr.io
+  script:
+    - |
+      set -euo pipefail
+      VERSION="${CI_COMMIT_TAG}"
+      SHA="${CI_COMMIT_SHORT_SHA}"
+      if printf '%s' "$VERSION" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+        PUBLISH_LATEST=1
+      else
+        PUBLISH_LATEST=0
+      fi
+      buildah bud --platform linux/amd64 \
+        -t "$GITLAB_IMAGE:$VERSION" \
+        -t "$GITLAB_IMAGE:$VERSION-$SHA" \
+        -t "$GHCR_IMAGE:$VERSION" \
+        -t "$GHCR_IMAGE:$VERSION-$SHA" \
+        .
+      for ref in \
+        "$GITLAB_IMAGE:$VERSION" \
+        "$GITLAB_IMAGE:$VERSION-$SHA" \
+        "$GHCR_IMAGE:$VERSION" \
+        "$GHCR_IMAGE:$VERSION-$SHA"; do
+        buildah push "docker://$ref"
+      done
+      if [ "$PUBLISH_LATEST" = "1" ]; then
+        buildah tag "$GITLAB_IMAGE:$VERSION" "$GITLAB_IMAGE:latest"
+        buildah tag "$GHCR_IMAGE:$VERSION" "$GHCR_IMAGE:latest"
+        buildah push "docker://$GITLAB_IMAGE:latest"
+        buildah push "docker://$GHCR_IMAGE:latest"
+      fi
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/
