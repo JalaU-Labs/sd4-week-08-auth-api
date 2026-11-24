@@ -23,3 +23,7 @@ services:
         value: "sd4-week-08-auth-api-client"
       - key: CASDOOR_CLIENT_SECRET
         sync: false
+      - key: CASDOOR_ISSUER
+        value: https://sd4-week-08-auth-api.onrender.com/casdoor
+      - key: CASDOOR_REDIRECT_URI
+        value: https://sd4-week-08-auth-api.onrender.com/auth/casdoor/callback
