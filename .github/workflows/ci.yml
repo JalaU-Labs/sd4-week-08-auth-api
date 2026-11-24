@@ -1,0 +1,147 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.13"
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint and format check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+
+  typecheck:
+    name: Type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run mypy src
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run pytest --cov=sd4_week_08_auth_api --cov-report=term-missing --cov-report=xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-xml
+          path: coverage.xml
+
+  build:
+    name: Build image (no push)
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test]
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          tags: sd4-week-08-auth-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  publish:
+    name: Publish image
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test]
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute image metadata
+        id: meta
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          SHA="${GITHUB_SHA::7}"
+          GHCR_IMAGE="ghcr.io/jalau-labs/sd4-week-08-auth-api"
+          GITLAB_IMAGE="registry.gitlab.com/jala-university1/cohort-5/es.cssd-245.ga.t2.26.m2/sd/group-b/individual-laboratories/alejandro-botina/week-08/sd4-week-08-auth-api"
+          if [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            PUBLISH_LATEST=1
+          else
+            PUBLISH_LATEST=0
+          fi
+          {
+            echo "VERSION=$VERSION"
+            echo "SHA=$SHA"
+            echo "GHCR_IMAGE=$GHCR_IMAGE"
+            echo "GITLAB_IMAGE=$GITLAB_IMAGE"
+            echo "PUBLISH_LATEST=$PUBLISH_LATEST"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to GitLab Registry
+        uses: docker/login-action@v3
+        with:
+          registry: registry.gitlab.com
+          username: ${{ secrets.GITLAB_DEPLOY_USER }}
+          password: ${{ secrets.GITLAB_DEPLOY_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.GHCR_IMAGE }}:${{ steps.meta.outputs.VERSION }}
+            ${{ steps.meta.outputs.GHCR_IMAGE }}:${{ steps.meta.outputs.VERSION }}-${{ steps.meta.outputs.SHA }}
+            ${{ steps.meta.outputs.GITLAB_IMAGE }}:${{ steps.meta.outputs.VERSION }}
+            ${{ steps.meta.outputs.GITLAB_IMAGE }}:${{ steps.meta.outputs.VERSION }}-${{ steps.meta.outputs.SHA }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Promote latest (stable releases only)
+        if: steps.meta.outputs.PUBLISH_LATEST == '1'
+        run: |
+          docker buildx imagetools create \
+            -t "${{ steps.meta.outputs.GHCR_IMAGE }}:latest" \
+            -t "${{ steps.meta.outputs.GITLAB_IMAGE }}:latest" \
+            "${{ steps.meta.outputs.GHCR_IMAGE }}:${{ steps.meta.outputs.VERSION }}"
