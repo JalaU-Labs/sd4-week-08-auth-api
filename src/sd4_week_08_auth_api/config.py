@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     )
 
     app_env: str = "development"
-    app_version: str = "0.1.4"
+    app_version: str = "0.1.5"
     log_level: str = "INFO"
     session_ttl_seconds: int = 3600
     casdoor_client_id: str = ""
