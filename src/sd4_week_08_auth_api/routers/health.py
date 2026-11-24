@@ -9,7 +9,7 @@ router = APIRouter(tags=["health"])
 
 class HealthResponse(BaseModel):
     status: str = Field(description="Health status.", examples=["ok"])
-    version: str = Field(description="Running application version.", examples=["0.1.5"])
+    version: str = Field(description="Running application version.", examples=["0.1.6"])
     environment: str = Field(
         description="Configured deployment environment.",
         examples=["production"],

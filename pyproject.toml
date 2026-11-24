@@ -1,6 +1,6 @@
 [project]
 name = "sd4-week-08-auth-api"
-version = "0.1.5"
+version = "0.1.6"
 description = "Public authentication API for Week 08 Lab (Software Development 4, Jala University)."
 readme = "README.md"
 license = { file = "LICENSE" }
