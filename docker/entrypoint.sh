@@ -7,6 +7,18 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+CASDOOR_CONFIG="/app/casdoor/conf/app.conf"
+
+if [ -n "${CASDOOR_ADMIN_PASSWORD:-}" ]; then
+    ESCAPED_PASSWORD=$(printf '%s' "$CASDOOR_ADMIN_PASSWORD" |
+        sed 's/[\/&|\\]/\\&/g')
+else
+    ESCAPED_PASSWORD=""
+    echo "Warning: CASDOOR_ADMIN_PASSWORD is unset or empty; Casdoor will use its welcome page." >&2
+fi
+
+sed -i "s|__CASDOOR_ADMIN_PASSWORD__|$ESCAPED_PASSWORD|" "$CASDOOR_CONFIG"
+
 /app/casdoor/casdoor &
 CASDOOR_PID=$!
 
