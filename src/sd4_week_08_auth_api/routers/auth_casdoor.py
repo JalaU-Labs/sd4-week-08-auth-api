@@ -27,7 +27,18 @@ from sd4_week_08_auth_api.services.user_store import DuplicateUserError, UserSto
 router = APIRouter(prefix="/auth/casdoor", tags=["Casdoor SSO"])
 
 
-@router.get("/login", summary="Start Casdoor single sign-on")
+@router.get(
+    "/login",
+    status_code=status.HTTP_302_FOUND,
+    summary="Start Casdoor single sign-on",
+    description=(
+        "Begin the OIDC Authorization Code flow. The API creates a one-time state value "
+        "and redirects the browser to the configured Casdoor issuer. Start SSO here rather "
+        "than opening Casdoor's `/casdoor/login` page directly."
+    ),
+    response_description="Redirects the browser to Casdoor's authorization page.",
+    responses={503: {"description": "Casdoor OIDC client settings are incomplete or invalid."}},
+)
 def login(
     state_store: Annotated[OAuthStateStore, Depends(get_oauth_state_store)],
 ) -> RedirectResponse:
@@ -46,14 +57,39 @@ def login(
     "/callback",
     response_model=TokenResponse,
     summary="Complete Casdoor single sign-on",
+    description=(
+        "Validate the one-time OAuth state, exchange the authorization code with Casdoor, "
+        "verify the ID token, provision the user if needed, and issue a local Bearer token. "
+        "Casdoor returns the browser to this endpoint."
+    ),
+    response_description="Casdoor authentication succeeded and a local Bearer token was issued.",
+    responses={
+        401: {
+            "description": (
+                "Authorization was denied, state is invalid, or Casdoor authentication failed."
+            )
+        },
+        409: {"description": "The Casdoor user could not be provisioned."},
+        502: {"description": "Casdoor's token or signing-key endpoint is unavailable."},
+        503: {"description": "Casdoor OIDC client settings are incomplete or invalid."},
+    },
 )
 def callback(
     state_store: Annotated[OAuthStateStore, Depends(get_oauth_state_store)],
     user_store: Annotated[UserStore, Depends(get_user_store)],
     session_store: Annotated[SessionStore, Depends(get_session_store)],
-    code: Annotated[str | None, Query()] = None,
-    state: Annotated[str | None, Query()] = None,
-    error: Annotated[str | None, Query()] = None,
+    code: Annotated[
+        str | None,
+        Query(description="Authorization code supplied by Casdoor after sign-in."),
+    ] = None,
+    state: Annotated[
+        str | None,
+        Query(description="One-time state value created by the API when SSO began."),
+    ] = None,
+    error: Annotated[
+        str | None,
+        Query(description="OAuth error returned by Casdoor if authorization was denied."),
+    ] = None,
 ) -> TokenResponse:
     if state is not None:
         state = unquote(state)

@@ -23,6 +23,12 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     response_model=UserPublic,
     status_code=status.HTTP_201_CREATED,
     summary="Register a new user",
+    description=(
+        "Create a local account with an email address, username, and password. "
+        "The response contains the public user profile and never includes the password."
+    ),
+    response_description="The account was created; sensitive password data is omitted.",
+    responses={409: {"description": "The email address or username is already registered."}},
 )
 async def register(
     payload: UserCreate,
@@ -42,6 +48,15 @@ async def register(
     "/login",
     response_model=TokenResponse,
     summary="Authenticate and obtain a session token",
+    description=(
+        "Authenticate a local account using its email address and password. The returned "
+        "opaque access token is a local session token, not a Casdoor token. Send it as "
+        "`Authorization: Bearer <access_token>` to protected endpoints."
+    ),
+    response_description="Credentials were accepted and a local Bearer token was issued.",
+    responses={
+        401: {"description": "The email or password is invalid, or the account is inactive."}
+    },
 )
 async def login(
     payload: LoginRequest,
@@ -67,6 +82,12 @@ async def login(
     "/me",
     response_model=UserPublic,
     summary="Return the authenticated user",
+    description=(
+        "Return the public profile associated with the current local session. Provide "
+        "the access token obtained from `/auth/login` or `/auth/casdoor/callback`."
+    ),
+    response_description="The authenticated user's public profile.",
+    responses={401: {"description": "The Bearer token is missing, invalid, expired, or inactive."}},
 )
 async def me(current_user: Annotated[UserInDB, Depends(get_current_user)]) -> UserPublic:
     return UserPublic.model_validate(current_user, from_attributes=True)
@@ -76,6 +97,12 @@ async def me(current_user: Annotated[UserInDB, Depends(get_current_user)]) -> Us
     "/logout",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Invalidate the current session token",
+    description=(
+        "Invalidate the current local session. A successful request has no response body; "
+        "the token cannot be used for subsequent authenticated requests."
+    ),
+    response_description="The session was invalidated.",
+    responses={401: {"description": "The Authorization header is missing or invalid."}},
 )
 async def logout(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
