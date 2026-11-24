@@ -4,6 +4,11 @@
 }
 
 :80 {
+	handle /casdoor/api/login/oauth/access_token {
+		uri strip_prefix /casdoor
+		reverse_proxy 127.0.0.1:8000
+	}
+
 	handle /casdoor* {
 		reverse_proxy 127.0.0.1:8000
 	}

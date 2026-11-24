@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlsplit
@@ -5,6 +6,7 @@ from urllib.parse import parse_qs, urlsplit
 import httpx
 import pytest
 from authlib.jose import JsonWebKey, jwt
+from authlib.jose.errors import JoseError
 from fastapi.testclient import TestClient
 
 from sd4_week_08_auth_api.config import settings
@@ -33,6 +35,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     monkeypatch.setattr(settings, "casdoor_client_id", CLIENT_ID)
     monkeypatch.setattr(settings, "casdoor_client_secret", CLIENT_SECRET)
     monkeypatch.setattr(settings, "casdoor_issuer", ISSUER)
+    monkeypatch.setattr(settings, "casdoor_internal_issuer", "")
     monkeypatch.setattr(settings, "casdoor_redirect_uri", REDIRECT_URI)
     app.dependency_overrides[get_user_store] = lambda: user_store
     app.dependency_overrides[get_session_store] = lambda: session_store
@@ -111,3 +114,112 @@ def test_full_casdoor_oidc_flow_with_signed_id_token(
     assert token_request["client_id"] == [CLIENT_ID]
     assert token_request["client_secret"] == [CLIENT_SECRET]
     assert token_request["redirect_uri"] == [REDIRECT_URI]
+
+
+def test_exchange_code_logs_http_failure_without_credentials(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    authorization_code = "authorization-code-canary"
+
+    def handle_request(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            401,
+            request=request,
+            text=f"Rejected {authorization_code} and {CLIENT_SECRET}",
+        )
+
+    monkeypatch.setattr(
+        casdoor_oidc,
+        "_new_http_client",
+        lambda: httpx.Client(transport=httpx.MockTransport(handle_request)),
+    )
+    caplog.set_level(logging.ERROR, logger=casdoor_oidc.__name__)
+
+    with pytest.raises(casdoor_oidc.OIDCAuthenticationError):
+        casdoor_oidc.exchange_code(authorization_code)
+
+    assert "HTTPStatusError" in caplog.text
+    assert "401" in caplog.text
+    assert authorization_code not in caplog.text
+    assert CLIENT_SECRET not in caplog.text
+
+
+def test_extract_user_info_logs_jose_failure_without_id_token(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    id_token = "id-token-canary"
+
+    def handle_request(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, request=request, json={"keys": []})
+
+    def fail_decode(*args: object, **kwargs: object) -> None:
+        raise JoseError(f"Invalid ID token: {id_token}")
+
+    monkeypatch.setattr(
+        casdoor_oidc,
+        "_new_http_client",
+        lambda: httpx.Client(transport=httpx.MockTransport(handle_request)),
+    )
+    monkeypatch.setattr(casdoor_oidc.JsonWebKey, "import_key_set", lambda jwks: {})
+    monkeypatch.setattr(casdoor_oidc.jwt, "decode", fail_decode)
+    caplog.set_level(logging.ERROR, logger=casdoor_oidc.__name__)
+
+    with pytest.raises(casdoor_oidc.OIDCAuthenticationError):
+        casdoor_oidc.extract_user_info(id_token)
+
+    assert "JoseError" in caplog.text
+    assert "Invalid ID token" in caplog.text
+    assert id_token not in caplog.text
+
+
+def test_internal_issuer_routes_token_and_jwks_requests_to_casdoor(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class ValidClaims(dict[str, str]):
+        def validate(self) -> None:
+            return None
+
+    requests: list[httpx.Request] = []
+
+    def handle_request(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.url.path == "/api/login/oauth/access_token":
+            return httpx.Response(200, request=request, json={"id_token": "test-id-token"})
+        if request.url.path == "/casdoor/.well-known/jwks":
+            return httpx.Response(200, request=request, json={"keys": []})
+        return httpx.Response(404, request=request)
+
+    monkeypatch.setattr(
+        settings,
+        "casdoor_internal_issuer",
+        "http://127.0.0.1:8000/casdoor",
+    )
+    monkeypatch.setattr(
+        casdoor_oidc,
+        "_new_http_client",
+        lambda: httpx.Client(transport=httpx.MockTransport(handle_request)),
+    )
+    monkeypatch.setattr(casdoor_oidc.JsonWebKey, "import_key_set", lambda jwks: {})
+    monkeypatch.setattr(
+        casdoor_oidc.jwt,
+        "decode",
+        lambda *args, **kwargs: ValidClaims(
+            sub="casdoor-subject-123",
+            email="internal-user@example.com",
+        ),
+    )
+
+    token_data = casdoor_oidc.exchange_code("authorization-code")
+    user_info = casdoor_oidc.extract_user_info(token_data["id_token"])
+
+    assert user_info.email == "internal-user@example.com"
+    assert user_info.preferred_username == "internal-user"
+    assert [str(request.url) for request in requests] == [
+        "http://127.0.0.1:8000/api/login/oauth/access_token",
+        "http://127.0.0.1:8000/casdoor/.well-known/jwks",
+    ]

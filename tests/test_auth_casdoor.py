@@ -1,7 +1,9 @@
+import logging
 from collections.abc import Iterator
 from urllib.parse import parse_qs, quote, urlsplit
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from sd4_week_08_auth_api.config import settings
@@ -11,6 +13,7 @@ from sd4_week_08_auth_api.deps import (
     get_user_store,
 )
 from sd4_week_08_auth_api.main import app
+from sd4_week_08_auth_api.routers import auth_casdoor
 from sd4_week_08_auth_api.services import casdoor_oidc
 from sd4_week_08_auth_api.services.casdoor_oidc import CasdoorUserInfo, OAuthStateStore
 from sd4_week_08_auth_api.services.session_store import SessionStore
@@ -168,3 +171,78 @@ def test_callback_state_can_only_be_used_once(
 
     assert client.get("/auth/casdoor/callback", params=callback).status_code == 200
     assert client.get("/auth/casdoor/callback", params=callback).status_code == 401
+
+
+@pytest.mark.parametrize(
+    ("oidc_error", "status_code"),
+    [
+        (casdoor_oidc.OIDCAuthenticationError("ID token signature verification failed"), 401),
+        (casdoor_oidc.OIDCConfigurationError("Casdoor client configuration is incomplete"), 503),
+        (casdoor_oidc.OIDCProviderError("JWKS endpoint is unavailable"), 502),
+    ],
+)
+def test_callback_logs_oidc_failure_details_without_authorization_code(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    oidc_error: casdoor_oidc.OIDCError,
+    status_code: int,
+) -> None:
+    authorization_code = "authorization-code-canary"
+    login = client.get("/auth/casdoor/login", follow_redirects=False)
+    state = parse_qs(urlsplit(login.headers["location"]).query)["state"][0]
+
+    def reject_code(code: str) -> dict[str, object]:
+        raise oidc_error
+
+    monkeypatch.setattr(casdoor_oidc, "exchange_code", reject_code)
+    caplog.set_level(
+        logging.ERROR,
+        logger="sd4_week_08_auth_api.routers.auth_casdoor",
+    )
+
+    response = client.get(
+        "/auth/casdoor/callback",
+        params={"code": authorization_code, "state": state},
+    )
+
+    assert response.status_code == status_code
+    assert str(oidc_error) in caplog.text
+    assert authorization_code not in caplog.text
+
+
+def test_callback_logs_user_provisioning_failure(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr(casdoor_oidc, "exchange_code", lambda code: {"id_token": "mock-id-token"})
+    monkeypatch.setattr(
+        casdoor_oidc,
+        "extract_user_info",
+        lambda token: CasdoorUserInfo(
+            sub="casdoor-user-123",
+            email="sso-user@example.com",
+            preferred_username="sso_user",
+        ),
+    )
+
+    def reject_user(user_info: CasdoorUserInfo, user_store: UserStore) -> None:
+        raise HTTPException(status_code=409, detail="Unable to provision Casdoor user")
+
+    monkeypatch.setattr(auth_casdoor, "_get_or_provision_user", reject_user)
+    login = client.get("/auth/casdoor/login", follow_redirects=False)
+    state = parse_qs(urlsplit(login.headers["location"]).query)["state"][0]
+    caplog.set_level(
+        logging.ERROR,
+        logger="sd4_week_08_auth_api.routers.auth_casdoor",
+    )
+
+    response = client.get(
+        "/auth/casdoor/callback",
+        params={"code": "authorization-code-canary", "state": state},
+    )
+
+    assert response.status_code == 409
+    assert "Unable to provision Casdoor user" in caplog.text
+    assert "authorization-code-canary" not in caplog.text

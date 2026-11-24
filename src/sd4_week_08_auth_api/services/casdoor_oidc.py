@@ -1,9 +1,10 @@
+import logging
 import secrets
 import time
 from dataclasses import dataclass
 from threading import Lock
 from typing import Any
-from urllib.parse import quote, urlencode, urlsplit
+from urllib.parse import quote, quote_plus, urlencode, urlsplit
 
 import httpx
 from authlib.jose import JsonWebKey, jwt  # type: ignore[import-untyped]
@@ -13,6 +14,8 @@ from sd4_week_08_auth_api.config import settings
 
 STATE_TTL_SECONDS = 300
 HTTP_TIMEOUT_SECONDS = 10.0
+
+logger = logging.getLogger(__name__)
 
 
 class OIDCError(Exception):
@@ -83,7 +86,26 @@ def _validate_configuration() -> tuple[str, str, str, str]:
     ):
         raise OIDCConfigurationError("Casdoor issuer must use HTTPS")
 
+    internal_issuer = settings.casdoor_internal_issuer.rstrip("/")
+    if internal_issuer:
+        internal_issuer_url = urlsplit(internal_issuer)
+        if internal_issuer_url.scheme not in {"http", "https"} or not internal_issuer_url.netloc:
+            raise OIDCConfigurationError("Casdoor internal issuer must be an absolute HTTP(S) URL")
+
     return issuer, client_id, client_secret, redirect_uri
+
+
+def _token_endpoint_url(issuer: str) -> str:
+    internal_issuer = settings.casdoor_internal_issuer.rstrip("/")
+    if internal_issuer:
+        internal_issuer_url = urlsplit(internal_issuer)
+        return f"{internal_issuer_url.scheme}://{internal_issuer_url.netloc}/api/login/oauth/access_token"
+    return f"{issuer}/api/login/oauth/access_token"
+
+
+def _jwks_endpoint_url(issuer: str) -> str:
+    internal_issuer = settings.casdoor_internal_issuer.rstrip("/")
+    return f"{internal_issuer or issuer}/.well-known/jwks"
 
 
 def get_authorization_url(state: str) -> str:
@@ -104,12 +126,21 @@ def _new_http_client() -> httpx.Client:
     return httpx.Client(timeout=HTTP_TIMEOUT_SECONDS)
 
 
+def _safe_error_detail(exc: Exception, *sensitive_values: str) -> str:
+    detail = str(exc)
+    for value in sensitive_values:
+        if value:
+            for candidate in (value, quote(value, safe=""), quote_plus(value)):
+                detail = detail.replace(candidate, "[REDACTED]")
+    return detail
+
+
 def exchange_code(code: str) -> dict[str, Any]:
     issuer, client_id, client_secret, redirect_uri = _validate_configuration()
     try:
         with _new_http_client() as client:
             response = client.post(
-                f"{issuer}/api/login/oauth/access_token",
+                _token_endpoint_url(issuer),
                 data={
                     "grant_type": "authorization_code",
                     "code": code,
@@ -121,13 +152,24 @@ def exchange_code(code: str) -> dict[str, Any]:
             response.raise_for_status()
             payload = response.json()
     except httpx.HTTPStatusError as exc:
+        logger.error(
+            "Casdoor token endpoint request failed (%s): %s",
+            type(exc).__name__,
+            _safe_error_detail(exc, code, client_secret),
+        )
         if exc.response.status_code < 500:
             raise OIDCAuthenticationError("Casdoor rejected the authorization code") from exc
         raise OIDCProviderError("Casdoor token endpoint is unavailable") from exc
     except (httpx.HTTPError, ValueError) as exc:
+        logger.error(
+            "Casdoor token endpoint request failed (%s): %s",
+            type(exc).__name__,
+            _safe_error_detail(exc, code, client_secret),
+        )
         raise OIDCProviderError("Casdoor token endpoint is unavailable") from exc
 
     if not isinstance(payload, dict) or payload.get("error"):
+        logger.error("Casdoor token endpoint returned an OAuth error response")
         raise OIDCAuthenticationError("Casdoor rejected the authorization code")
     if not isinstance(payload.get("id_token"), str):
         raise OIDCAuthenticationError("Casdoor response did not contain an ID token")
@@ -138,7 +180,7 @@ def extract_user_info(id_token: str) -> CasdoorUserInfo:
     issuer, client_id, _, _ = _validate_configuration()
     try:
         with _new_http_client() as client:
-            response = client.get(f"{issuer}/.well-known/jwks")
+            response = client.get(_jwks_endpoint_url(issuer))
             response.raise_for_status()
             jwks = response.json()
         if not isinstance(jwks, dict) or not isinstance(jwks.get("keys"), list):
@@ -153,21 +195,37 @@ def extract_user_info(id_token: str) -> CasdoorUserInfo:
                 "aud": {"essential": True, "value": client_id},
                 "sub": {"essential": True},
                 "email": {"essential": True},
-                "preferred_username": {"essential": True},
             },
         )
         claims.validate()
     except OIDCError:
         raise
     except httpx.HTTPError as exc:
+        logger.error(
+            "Casdoor JWKS request failed (%s): %s",
+            type(exc).__name__,
+            _safe_error_detail(exc, id_token),
+        )
         raise OIDCProviderError("Casdoor signing keys are unavailable") from exc
     except (JoseError, ValueError, TypeError) as exc:
+        logger.error(
+            "Casdoor ID token validation failed (%s): %s",
+            type(exc).__name__,
+            _safe_error_detail(exc, id_token, *id_token.split(".")),
+        )
         raise OIDCAuthenticationError("Casdoor ID token is invalid") from exc
 
     subject = claims.get("sub")
     email = claims.get("email")
     username = claims.get("preferred_username")
-    if not all(isinstance(value, str) and value for value in (subject, email, username)):
+    if not isinstance(subject, str) or not subject or not isinstance(email, str) or not email:
+        raise OIDCAuthenticationError("Casdoor ID token is missing required user claims")
+
+    if not isinstance(username, str) or not username:
+        username = claims.get("name")
+    if not isinstance(username, str) or not username:
+        username = email.partition("@")[0]
+    if not username:
         raise OIDCAuthenticationError("Casdoor ID token is missing required user claims")
 
     return CasdoorUserInfo(sub=subject, email=email, preferred_username=username)

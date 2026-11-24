@@ -25,5 +25,7 @@ services:
         sync: false
       - key: CASDOOR_ISSUER
         value: https://sd4-week-08-auth-api.onrender.com/casdoor
+      - key: CASDOOR_INTERNAL_ISSUER
+        value: http://127.0.0.1:8000/casdoor
       - key: CASDOOR_REDIRECT_URI
         value: https://sd4-week-08-auth-api.onrender.com/auth/casdoor/callback

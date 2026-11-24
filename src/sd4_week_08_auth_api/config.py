@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     casdoor_client_id: str = ""
     casdoor_client_secret: str = ""
     casdoor_issuer: str = ""
+    casdoor_internal_issuer: str = ""
     casdoor_redirect_uri: str = ""
 
 

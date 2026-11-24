@@ -1,3 +1,4 @@
+import logging
 import re
 import secrets
 from hashlib import sha256
@@ -25,6 +26,7 @@ from sd4_week_08_auth_api.services.session_store import SessionStore
 from sd4_week_08_auth_api.services.user_store import DuplicateUserError, UserStore
 
 router = APIRouter(prefix="/auth/casdoor", tags=["Casdoor SSO"])
+logger = logging.getLogger(__name__)
 
 
 @router.get(
@@ -113,22 +115,33 @@ def callback(
             )
         user_info = casdoor_oidc.extract_user_info(id_token)
     except casdoor_oidc.OIDCAuthenticationError as exc:
+        logger.error("Casdoor OIDC authentication failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Casdoor authentication failed",
         ) from exc
     except casdoor_oidc.OIDCConfigurationError as exc:
+        logger.error("Casdoor OIDC configuration error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Casdoor OIDC is not configured",
         ) from exc
     except casdoor_oidc.OIDCProviderError as exc:
+        logger.error("Casdoor OIDC provider error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Casdoor authentication service is unavailable",
         ) from exc
 
-    user = _get_or_provision_user(user_info, user_store)
+    try:
+        user = _get_or_provision_user(user_info, user_store)
+    except HTTPException as exc:
+        logger.error(
+            "Casdoor user provisioning failed (HTTP %s): %s",
+            exc.status_code,
+            exc.detail,
+        )
+        raise
     token = session_store.create(user.id)
     return TokenResponse(access_token=token, expires_in=session_store.ttl_seconds)
 
