@@ -104,13 +104,13 @@ publish:
         "$GITLAB_IMAGE:$VERSION-$SHA" \
         "$GHCR_IMAGE:$VERSION" \
         "$GHCR_IMAGE:$VERSION-$SHA"; do
-        buildah push "docker://$ref"
+        buildah push "$ref" "docker://$ref"
       done
       if [ "$PUBLISH_LATEST" = "1" ]; then
         buildah tag "$GITLAB_IMAGE:$VERSION" "$GITLAB_IMAGE:latest"
         buildah tag "$GHCR_IMAGE:$VERSION" "$GHCR_IMAGE:latest"
-        buildah push "docker://$GITLAB_IMAGE:latest"
-        buildah push "docker://$GHCR_IMAGE:latest"
+        buildah push "$GITLAB_IMAGE:latest" "docker://$GITLAB_IMAGE:latest"
+        buildah push "$GHCR_IMAGE:latest" "docker://$GHCR_IMAGE:latest"
       fi
   rules:
     - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/
