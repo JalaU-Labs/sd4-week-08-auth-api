@@ -5,10 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-11-24
+
+### Fixed
+- Removed unused empty Casdoor init-data records that caused duplicate organization-key failures during startup.
+- Validate generated init-data JSON and provider/organization identities before starting Casdoor.
+
 ## [0.1.3] - 2026-11-24
 
 ### Fixed
-- Corrected Casdoor provider seed identities, removed empty placeholder records, and added startup validation to prevent empty-name and duplicate-key panics.
+- Added a named Casdoor provider seed and startup validation for provider name and owner.
 
 ## [0.1.2] - 2026-11-24
 
