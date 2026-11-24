@@ -21,10 +21,10 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY src/ ./src/
 
 # Use the official image at the same pinned version for its binary and web assets.
-FROM casbin/casdoor:v${CASDOOR_VERSION} AS casdoor
+FROM docker.io/casbin/casdoor:v${CASDOOR_VERSION} AS casdoor
 
 # ---------- Stage 2: runtime ----------
-FROM python:3.13-slim AS runtime
+FROM docker.io/library/python:3.13-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
