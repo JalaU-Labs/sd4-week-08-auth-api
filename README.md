@@ -12,6 +12,7 @@ Public authentication API for testing (FastAPI + Swagger UI), containerized with
 - [CI/CD](#cicd)
 - [Deployment](#deployment)
 - [API Contract](#api-contract)
+- [Documentation](#documentation)
 - [Casdoor SSO Integration](#casdoor-sso-integration)
 - [Changelog](CHANGELOG.md)
 - [License](#license)
@@ -184,6 +185,12 @@ Interactive API documentation is available at `/docs`; the OpenAPI schema is ava
 | `GET` | `/health` | Liveness and version information. |
 | `GET` | `/ready` | Readiness status. |
 
+## Documentation
+
+Open Swagger UI at [`/docs`](https://sd4-week-08-auth-api.onrender.com/docs) or retrieve the OpenAPI schema at [`/openapi.json`](https://sd4-week-08-auth-api.onrender.com/openapi.json). The schema includes endpoint descriptions, request and response examples, and documented error responses.
+
+To try an authenticated endpoint, obtain a token from `POST /auth/login` or finish sign-in through `/auth/casdoor/login`. In Swagger UI, click **Authorize**, paste the access token without a `Bearer ` prefix, and confirm. Swagger UI applies the Bearer scheme to protected requests; use `GET /auth/me` to verify it.
+
 ## Casdoor SSO Integration
 
 The API supports both its local `/auth/*` endpoints and Casdoor single sign-on using the OIDC Authorization Code flow:
@@ -204,6 +211,10 @@ The ID token is verified against Casdoor's JWKS endpoint, issuer, and client ID.
 Set `CASDOOR_CLIENT_SECRET` in the Render service's environment settings before starting or redeploying the service. Treat it as a secret and do not commit it. The startup process injects it into Casdoor's declarative `sd4-auth-api` application; `CASDOOR_CLIENT_ID` is configured as `sd4-week-08-auth-api-client` in `render.yaml`. The issuer and callback URI are also configured there.
 
 For a local deployment, set `CASDOOR_CLIENT_ID`, `CASDOOR_CLIENT_SECRET`, `CASDOOR_ISSUER`, and `CASDOOR_REDIRECT_URI` in the environment. These can remain empty when only running tests that mock Casdoor.
+
+### Troubleshooting the redirect flow
+
+Start SSO at `/auth/casdoor/login`. Opening `/casdoor/login` directly displays Casdoor's own login page and does not start the API's OIDC authorization flow. The API URL-encodes the one-time `state` sent to Casdoor and decodes the returned value before validation. Confirm that the Casdoor application's client ID and secret match `CASDOOR_CLIENT_ID` and `CASDOOR_CLIENT_SECRET`, and that its registered redirect URI exactly matches `CASDOOR_REDIRECT_URI`. In Render, set the `CASDOOR_CLIENT_SECRET` value manually in the service environment; the Blueprint intentionally marks it as unsynchronized.
 
 ### Manually test the public flow
 
