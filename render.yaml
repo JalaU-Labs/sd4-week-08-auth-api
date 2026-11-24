@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: sd4-week-08-auth-api
+    runtime: image
+    image:
+      url: ghcr.io/jalau-labs/sd4-week-08-auth-api:latest
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    autoDeployTrigger: off
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_VERSION
+        value: "0.1.0"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: SESSION_TTL_SECONDS
+        value: "3600"
+      - key: CASDOOR_ADMIN_PASSWORD
+        sync: false
