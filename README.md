@@ -12,27 +12,46 @@ Public authentication API for testing (FastAPI + Swagger UI), containerized with
 - [CI/CD](#cicd)
 - [Deployment](#deployment)
 - [API Contract](#api-contract)
+- [Casdoor SSO Integration](#casdoor-sso-integration)
+- [Changelog](CHANGELOG.md)
 - [License](#license)
 
 ## Features
 
-_To be completed in later steps._
+- Local authentication endpoints for registration, login, the current user, and logout.
+- In-memory user and session stores with expiring Bearer tokens.
+- Casdoor OIDC sign-in with one-time state validation, ID-token verification, JIT user provisioning, and local API token issuance.
+- Swagger UI and OpenAPI schema.
+- Health and readiness endpoints for local and deployed environments.
+- A multi-stage Docker image containing FastAPI, Casdoor, and Caddy.
 
 ## Requirements
 
-_To be completed in later steps._
+- Python 3.13 or newer for local development.
+- [uv](https://docs.astral.sh/uv/) for dependency management and running Python commands.
+- Docker Engine with the Docker Compose v2 plugin for container workflows.
+- GNU Make for the optional `make` shortcuts.
 
 ## Local Development
 
-_To be completed in later steps._
+Install dependencies and prepare a local environment file:
+
+```sh
+uv sync
+cp .env.example .env
+```
+
+Run the API with hot reload:
+
+```sh
+make run
+```
+
+The development server listens on `http://localhost:8000`. Open `/docs` for Swagger UI. Local OIDC settings can remain empty unless Casdoor is configured; the OIDC tests use mocks. Run `make check` to lint, check formatting and types, and run tests.
 
 ## Production
 
-_To be completed in later steps._
-
-## Docker
-
-The production image runs the FastAPI application, Casdoor, and Caddy together. Run the production Compose file explicitly to avoid merging the development override:
+Run the production Compose configuration explicitly so it does not merge the development override:
 
 ```sh
 docker compose -f docker-compose.yml up --build -d
@@ -40,13 +59,19 @@ docker compose -f docker-compose.yml ps
 docker compose -f docker-compose.yml logs -f api
 ```
 
-The service is available at `http://localhost:8080`. FastAPI's Swagger UI is at `/docs`, Casdoor is at `/casdoor/`, and the API health endpoints are `/health` and `/ready`. The production health check monitors `/health`.
-
-Stop the production stack with:
+The API is available at `http://localhost:8080`; Casdoor is at `/casdoor/`. Stop the services with:
 
 ```sh
 docker compose -f docker-compose.yml down
 ```
+
+For a deployed environment, configure secrets such as `CASDOOR_ADMIN_PASSWORD` in the deployment platform rather than committing them.
+
+## Docker
+
+The production image runs the FastAPI application, Casdoor, and Caddy together.
+
+The service is available at `http://localhost:8080`. FastAPI's Swagger UI is at `/docs`, Casdoor is at `/casdoor/`, and the API health endpoints are `/health` and `/ready`. The production health check monitors `/health`.
 
 For development, the default Compose command automatically merges `docker-compose.override.yml`. It bind-mounts `src/` and enables Uvicorn hot reload on port `8080`:
 
@@ -86,15 +111,15 @@ GitHub Actions uses its built-in `GITHUB_TOKEN` to publish to GHCR.
 To cut a release:
 
 ```fish
-git tag -a v0.1.0 -m "Release v0.1.0"
-git push origin v0.1.0
+git tag -a v0.1.2 -m "Release v0.1.2"
+git push origin v0.1.2
 ```
 
 To consume a published image:
 
 ```fish
-docker pull ghcr.io/jalau-labs/sd4-week-08-auth-api:v0.1.0
-docker run --rm -p 8080:80 ghcr.io/jalau-labs/sd4-week-08-auth-api:v0.1.0
+docker pull ghcr.io/jalau-labs/sd4-week-08-auth-api:v0.1.2
+docker run --rm -p 8080:80 ghcr.io/jalau-labs/sd4-week-08-auth-api:v0.1.2
 ```
 
 ## Deployment
@@ -146,7 +171,18 @@ As an alternative, pin `render.yaml` to a specific image tag, such as `:v0.1.0`,
 
 ## API Contract
 
-_To be completed in later steps._
+Interactive API documentation is available at `/docs`; the OpenAPI schema is available at `/openapi.json`. On the public deployment these are `https://sd4-week-08-auth-api.onrender.com/docs` and `https://sd4-week-08-auth-api.onrender.com/openapi.json`.
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/auth/register` | Register a local user. |
+| `POST` | `/auth/login` | Authenticate and receive a local Bearer token. |
+| `GET` | `/auth/me` | Get the current user using a Bearer token. |
+| `POST` | `/auth/logout` | Invalidate the current Bearer token. |
+| `GET` | `/auth/casdoor/login` | Start the Casdoor OIDC authorization flow. |
+| `GET` | `/auth/casdoor/callback` | Complete OIDC sign-in and receive a local Bearer token. |
+| `GET` | `/health` | Liveness and version information. |
+| `GET` | `/ready` | Readiness status. |
 
 ## Casdoor SSO Integration
 
