@@ -99,7 +99,50 @@ docker run --rm -p 8080:80 ghcr.io/jalau-labs/sd4-week-08-auth-api:v0.1.0
 
 ## Deployment
 
-_To be completed in later steps._
+The Render service uses the Free plan and an image-backed deployment source. It consumes `ghcr.io/jalau-labs/sd4-week-08-auth-api:latest`. The Free plan sleeps after 15 minutes of inactivity; the first request after sleep may take 10 to 30 seconds while the service cold starts.
+
+### One-time manual first deploy
+
+1. Open https://dashboard.render.com/blueprints and click **New Blueprint Instance**.
+2. Connect the GitHub repository `JalaU-Labs/sd4-week-08-auth-api` and select the `main` branch.
+3. Render detects `render.yaml` and shows the `sd4-week-08-auth-api` service. When prompted for `CASDOOR_ADMIN_PASSWORD`, enter a strong password and store it in a password manager.
+4. Confirm the sync. Wait for the first deploy to finish and for the health check on `/health` to turn green.
+5. Open the public URL and verify:
+   - `https://<service>.onrender.com/health` returns `{"status":"ok",...}`.
+   - `https://<service>.onrender.com/docs` shows Swagger UI with `/auth/*` endpoints.
+   - `https://<service>.onrender.com/casdoor/` shows the Casdoor login page.
+
+### Extracting credentials for automated deploys
+
+To configure the Deploy Hook:
+
+1. Open the Render Dashboard.
+2. Select the `sd4-week-08-auth-api` service.
+3. Open **Settings** and find **Deploy Hook**.
+4. Copy the Deploy Hook URL.
+5. Add it to GitHub as the `RENDER_DEPLOY_HOOK` repository secret:
+
+   ```fish
+   gh secret set RENDER_DEPLOY_HOOK -R JalaU-Labs/sd4-week-08-auth-api --body "<hook-url>"
+   ```
+
+Optional API-based checks can use `RENDER_API_KEY` and `RENDER_SERVICE_ID`. Obtain `RENDER_API_KEY` from the Render Dashboard account API-key settings, and obtain `RENDER_SERVICE_ID` from the service settings or service URL. Store both as GitHub Secrets or repository variables as appropriate. The current Deploy Hook workflow requires only `RENDER_DEPLOY_HOOK`.
+
+### Automated deploys
+
+Pushing a stable tag `vX.Y.Z` triggers the `Deploy to Render` GitHub Actions workflow. The workflow POSTs to the Deploy Hook, and Render pulls `:latest`, which the CI pipeline publishes for the same stable tag. Pre-release tags such as `vX.Y.Z-rc.N` do not trigger deployment.
+
+For a manual deploy, use Render Dashboard → **Manual Deploy** → **Deploy latest image**, or run the `Deploy to Render` workflow from the GitHub Actions **Run workflow** option.
+
+### Rollback
+
+The recommended rollback method for this lab is Render Dashboard → **Deploys**, select a previous successful deploy, and choose **Rollback**.
+
+As an alternative, pin `render.yaml` to a specific image tag, such as `:v0.1.0`, and re-sync the Blueprint. This repository currently recommends Dashboard rollback instead of pinning the image tag.
+
+### Secret hygiene
+
+`CASDOOR_ADMIN_PASSWORD` is stored only in the Render Dashboard. `RENDER_DEPLOY_HOOK` is stored only as a GitHub Secret. Secret values are never committed to the repository or printed in workflow logs.
 
 ## API Contract
 
