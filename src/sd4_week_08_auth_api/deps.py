@@ -6,6 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from sd4_week_08_auth_api.config import settings
 from sd4_week_08_auth_api.models.user import UserInDB
+from sd4_week_08_auth_api.services.casdoor_oidc import OAuthStateStore
 from sd4_week_08_auth_api.services.session_store import SessionStore
 from sd4_week_08_auth_api.services.user_store import UserStore
 
@@ -20,6 +21,11 @@ def get_user_store() -> UserStore:
 @lru_cache
 def get_session_store() -> SessionStore:
     return SessionStore(ttl_seconds=settings.session_ttl_seconds)
+
+
+@lru_cache
+def get_oauth_state_store() -> OAuthStateStore:
+    return OAuthStateStore()
 
 
 def get_current_user(
