@@ -10,9 +10,7 @@ CONFIG_INJECTOR = ROOT / "docker/inject-casdoor-config.sh"
 
 def test_init_data_template_defines_casdoor_oidc_application() -> None:
     init_data = json.loads(INIT_DATA_TEMPLATE.read_text())
-    application = next(
-        item for item in init_data["applications"] if item["name"] == "sd4-auth-api"
-    )
+    application = next(item for item in init_data["applications"] if item["name"] == "sd4-auth-api")
 
     assert application["clientId"] == "__CASDOOR_CLIENT_ID__"
     assert application["clientSecret"] == "__CASDOOR_CLIENT_SECRET__"
