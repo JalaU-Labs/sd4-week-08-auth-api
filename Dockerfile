@@ -56,6 +56,7 @@ COPY --from=casdoor --chown=appuser:appgroup /swagger /app/swagger
 COPY --chown=appuser:appgroup docker/casdoor/app.conf /app/casdoor/conf/app.conf
 COPY --chown=appuser:appgroup docker/casdoor/init_data.json.template /app/casdoor/conf/init_data.json.template
 COPY --chown=appuser:appgroup docker/Caddyfile /etc/caddy/Caddyfile
+RUN caddy fmt --overwrite /etc/caddy/Caddyfile
 COPY --chown=appuser:appgroup docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 RUN chmod +x /usr/local/bin/entrypoint.sh
