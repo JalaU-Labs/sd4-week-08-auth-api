@@ -130,9 +130,9 @@
   ],
   "applications": [
     {
-      "owner": "",
-      "name": "",
-      "displayName": "",
+      "owner": "admin",
+      "name": "sd4-auth-api",
+      "displayName": "SD4 Auth API",
       "logo": "",
       "homepageUrl": "",
       "organization": "",
@@ -140,8 +140,9 @@
       "enablePassword": true,
       "enableSignUp": true,
       "disableSignin": false,
-      "clientId": "",
-      "clientSecret": "",
+      "clientId": "__CASDOOR_CLIENT_ID__",
+      "clientSecret": "__CASDOOR_CLIENT_SECRET__",
+      "isEnabled": true,
       "providers": [
         {
           "name": "",
@@ -233,15 +234,10 @@
         }
       ],
       "grantTypes": [
-        "authorization_code",
-        "password",
-        "client_credentials",
-        "token",
-        "id_token",
-        "refresh_token"
+        "authorization_code"
       ],
       "redirectUris": [
-        "http://localhost:9000/callback"
+        "https://sd4-week-08-auth-api.onrender.com/auth/casdoor/callback"
       ],
       "tokenFormat": "JWT",
       "tokenFields": [],
