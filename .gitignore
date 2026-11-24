@@ -37,3 +37,8 @@ desktop.ini
 
 # Local Python version pin
 .python-version
+
+# Final report deliverables and generation scripts
+report/
+deliverables/
+individual-lab-week-8-diego-alejandro-botina-software-development-4.docx
