@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     log_level: str = "INFO"
     session_ttl_seconds: int = 3600
+    casdoor_client_id: str = ""
+    casdoor_client_secret: str = ""
+    casdoor_issuer: str = ""
+    casdoor_redirect_uri: str = ""
 
 
 @lru_cache
