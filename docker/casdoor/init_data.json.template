@@ -143,16 +143,7 @@
       "clientId": "__CASDOOR_CLIENT_ID__",
       "clientSecret": "__CASDOOR_CLIENT_SECRET__",
       "isEnabled": true,
-      "providers": [
-        {
-          "name": "",
-          "canSignUp": true,
-          "canSignIn": true,
-          "canUnlink": false,
-          "prompted": false,
-          "alertType": "None"
-        }
-      ],
+      "providers": [],
       "signinMethods": [
         {
           "name": "Password",
@@ -273,11 +264,13 @@
   ],
   "providers": [
     {
-      "owner": "",
-      "name": "",
-      "displayName": "",
-      "category": "",
-      "type": ""
+      "owner": "admin",
+      "name": "provider_default",
+      "displayName": "Default Provider",
+      "category": "OAuth",
+      "type": "GitHub",
+      "clientId": "placeholder",
+      "clientSecret": "placeholder"
     }
   ],
   "certs": [
