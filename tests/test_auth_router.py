@@ -11,8 +11,10 @@ from sd4_week_08_auth_api.services.user_store import UserStore
 
 @pytest.fixture()
 def client() -> Iterator[TestClient]:
-    app.dependency_overrides[get_user_store] = UserStore
-    app.dependency_overrides[get_session_store] = lambda: SessionStore(ttl_seconds=3600)
+    user_store = UserStore()
+    session_store = SessionStore(ttl_seconds=3600)
+    app.dependency_overrides[get_user_store] = lambda: user_store
+    app.dependency_overrides[get_session_store] = lambda: session_store
     try:
         yield TestClient(app)
     finally:

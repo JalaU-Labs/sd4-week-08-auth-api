@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from sd4_week_08_auth_api import __version__
-from sd4_week_08_auth_api.routers import health
+from sd4_week_08_auth_api.routers import auth, health
 
 
 @asynccontextmanager
@@ -29,3 +29,4 @@ app = FastAPI(
 )
 
 app.include_router(health.router)
+app.include_router(auth.router)
