@@ -175,7 +175,7 @@ For a local deployment, set `CASDOOR_CLIENT_ID`, `CASDOOR_CLIENT_SECRET`, `CASDO
 2. Sign in through Casdoor. The browser returns to the API callback and displays a JSON response containing `access_token`.
 3. Use that token with the API, for example by authorizing Swagger UI at `https://sd4-week-08-auth-api.onrender.com/docs` and requesting `/auth/me`.
 
-Users are provisioned just in time (JIT): the first successful Casdoor sign-in creates a local user using the verified token's email and preferred username. Later sign-ins resolve the local account by email.
+Users are provisioned just in time (JIT): the first successful Casdoor sign-in creates a local user using the email and preferred username claims from the verified ID token. Later sign-ins resolve the local account by email.
 
 ## License
 
