@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
@@ -53,6 +53,49 @@ def test_login_redirects_to_casdoor_with_state(client: TestClient) -> None:
     assert query["response_type"] == ["code"]
     assert query["scope"] == ["openid profile email"]
     assert query["state"]
+
+
+def test_login_encodes_reserved_characters_in_state(client: TestClient) -> None:
+    state = "opaque state+/value"
+
+    encoded_url = casdoor_oidc.get_authorization_url(state)
+    query = parse_qs(urlsplit(encoded_url).query)
+
+    assert query["state"] == [quote(state, safe="")]
+
+
+def test_callback_decodes_state_returned_by_casdoor(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state = "opaque state+/value"
+
+    class FixedStateStore:
+        def create(self) -> str:
+            return state
+
+        def consume(self, received_state: str) -> bool:
+            return received_state == state
+
+    app.dependency_overrides[get_oauth_state_store] = lambda: FixedStateStore()
+    monkeypatch.setattr(casdoor_oidc, "exchange_code", lambda code: {"id_token": "mock-id-token"})
+    monkeypatch.setattr(
+        casdoor_oidc,
+        "extract_user_info",
+        lambda token: CasdoorUserInfo(
+            sub="casdoor-user-123",
+            email="sso-user@example.com",
+            preferred_username="sso_user",
+        ),
+    )
+    encoded_state = quote(state, safe="")
+
+    response = client.get(
+        "/auth/casdoor/callback",
+        params={"code": "valid-code", "state": encoded_state},
+    )
+
+    assert response.status_code == 200
 
 
 def test_callback_provisions_user_and_issues_local_bearer_token(

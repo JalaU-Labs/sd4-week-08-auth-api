@@ -2,6 +2,7 @@ import re
 import secrets
 from hashlib import sha256
 from typing import Annotated
+from urllib.parse import unquote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
@@ -54,6 +55,8 @@ def callback(
     state: Annotated[str | None, Query()] = None,
     error: Annotated[str | None, Query()] = None,
 ) -> TokenResponse:
+    if state is not None:
+        state = unquote(state)
     if error is not None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

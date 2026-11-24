@@ -3,7 +3,7 @@ import time
 from dataclasses import dataclass
 from threading import Lock
 from typing import Any
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 
 import httpx
 from authlib.jose import JsonWebKey, jwt  # type: ignore[import-untyped]
@@ -94,7 +94,7 @@ def get_authorization_url(state: str) -> str:
             "redirect_uri": redirect_uri,
             "response_type": "code",
             "scope": "openid profile email",
-            "state": state,
+            "state": quote(state, safe=""),
         }
     )
     return f"{issuer}/login/oauth/authorize?{query}"
