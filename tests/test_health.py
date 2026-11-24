@@ -40,3 +40,9 @@ def test_swagger_ui_is_served() -> None:
     response = client.get("/docs")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
+
+
+def test_lifespan_context_runs() -> None:
+    with TestClient(app) as client:
+        response = client.get("/health")
+        assert response.status_code == 200
