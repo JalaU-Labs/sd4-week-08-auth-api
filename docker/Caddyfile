@@ -1,0 +1,15 @@
+{
+    auto_https off
+    admin off
+}
+
+:80 {
+    handle /casdoor* {
+        uri strip_prefix /casdoor
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    handle {
+        reverse_proxy 127.0.0.1:8080
+    }
+}
