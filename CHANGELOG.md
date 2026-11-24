@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.3] - 2026-11-24
 
 ### Fixed
-- Corrected Casdoor provider seed identities and added startup validation to prevent empty provider names.
+- Corrected Casdoor provider seed identities, removed empty placeholder records, and added startup validation to prevent empty-name and duplicate-key panics.
 
 ## [0.1.2] - 2026-11-24
 

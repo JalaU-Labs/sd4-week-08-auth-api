@@ -15,3 +15,12 @@ def test_init_data_template_providers_have_name_and_owner() -> None:
     for application in data.get("applications", []):
         for provider in application.get("providers", []):
             assert provider.get("name"), f"Application provider missing name: {provider}"
+
+
+def test_init_data_template_organizations_have_name_and_owner() -> None:
+    path = Path(__file__).parent.parent / "docker" / "casdoor" / "init_data.json.template"
+    data = json.loads(path.read_text())
+
+    for organization in data.get("organizations", []):
+        assert organization.get("name"), f"Organization missing name: {organization}"
+        assert organization.get("owner"), f"Organization missing owner: {organization}"

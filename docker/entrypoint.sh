@@ -22,6 +22,20 @@ import sys
 with open("/app/casdoor/conf/init_data.json") as f:
     data = json.load(f)
 
+for index, organization in enumerate(data.get("organizations", [])):
+    if (
+        not isinstance(organization, dict)
+        or not isinstance(organization.get("name"), str)
+        or not organization["name"].strip()
+        or not isinstance(organization.get("owner"), str)
+        or not organization["owner"].strip()
+    ):
+        print(
+            f"ERROR: Organization at index {index} is missing a non-empty name or owner.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
 for index, provider in enumerate(data.get("providers", [])):
     if (
         not isinstance(provider, dict)
