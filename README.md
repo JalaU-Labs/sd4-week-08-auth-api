@@ -148,6 +148,35 @@ As an alternative, pin `render.yaml` to a specific image tag, such as `:v0.1.0`,
 
 _To be completed in later steps._
 
+## Casdoor SSO Integration
+
+The API supports both its local `/auth/*` endpoints and Casdoor single sign-on using the OIDC Authorization Code flow:
+
+```text
+GET /auth/casdoor/login
+  -> Casdoor sign-in and consent
+  -> GET /auth/casdoor/callback?code=...&state=...
+  -> validate state, exchange code, and verify the ID token
+  -> provision the local user on first sign-in
+  -> return a local Bearer access token
+```
+
+The ID token is verified against Casdoor's JWKS endpoint, issuer, and client ID. The resulting access token is an API session token and can be used with `/auth/me` like a token from `/auth/login`.
+
+### Configure the client secret in Render
+
+Set `CASDOOR_CLIENT_SECRET` in the Render service's environment settings before starting or redeploying the service. Treat it as a secret and do not commit it. The startup process injects it into Casdoor's declarative `sd4-auth-api` application; `CASDOOR_CLIENT_ID` is configured as `sd4-week-08-auth-api-client` in `render.yaml`. The issuer and callback URI are also configured there.
+
+For a local deployment, set `CASDOOR_CLIENT_ID`, `CASDOOR_CLIENT_SECRET`, `CASDOOR_ISSUER`, and `CASDOOR_REDIRECT_URI` in the environment. These can remain empty when only running tests that mock Casdoor.
+
+### Manually test the public flow
+
+1. Open `https://sd4-week-08-auth-api.onrender.com/auth/casdoor/login`.
+2. Sign in through Casdoor. The browser returns to the API callback and displays a JSON response containing `access_token`.
+3. Use that token with the API, for example by authorizing Swagger UI at `https://sd4-week-08-auth-api.onrender.com/docs` and requesting `/auth/me`.
+
+Users are provisioned just in time (JIT): the first successful Casdoor sign-in creates a local user using the verified token's email and preferred username. Later sign-ins resolve the local account by email.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
