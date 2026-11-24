@@ -1,0 +1,69 @@
+name: Deploy to Render
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+concurrency:
+  group: render-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Trigger Render deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Render deploy configuration
+        id: render_config
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK is not configured; skipping deployment." >&2
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
+      - name: Check stable release tag
+        id: tag_check
+        if: steps.render_config.outputs.configured == 'true'
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "stable=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+            echo "Not a tag push; skipping." >&2
+            echo "stable=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          TAG="${GITHUB_REF_NAME}"
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "stable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "stable=false" >> "$GITHUB_OUTPUT"
+            echo "Tag $TAG is not a stable release; skipping." >&2
+          fi
+
+      - name: Trigger Render deploy hook
+        if: steps.tag_check.outputs.stable == 'true'
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          set -euo pipefail
+          response="$(curl --fail-with-body --silent --show-error --request POST "$RENDER_DEPLOY_HOOK")"
+          printf '%s\n' "$response"
+          deploy_id="$(printf '%s' "$response" | python -c 'import json,sys; print(json.load(sys.stdin).get("deploy", {}).get("id", ""))')"
+          if [ -n "$deploy_id" ]; then
+            printf 'Triggered Render deploy: %s\n' "$deploy_id"
+            printf '### Render deploy: `%s`\n' "$deploy_id" >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf 'Render accepted the request but did not return a deploy id (another deploy may be in progress).\n'
+            printf '### Render deploy: accepted (no id returned)\n' >> "$GITHUB_STEP_SUMMARY"
+          fi
