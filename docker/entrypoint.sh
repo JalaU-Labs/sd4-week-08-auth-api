@@ -7,7 +7,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-/app/casdoor/casdoor -config /app/casdoor/conf/app.conf &
+/app/casdoor/casdoor &
 CASDOOR_PID=$!
 
 uvicorn sd4_week_08_auth_api.main:app --host 127.0.0.1 --port 8080 --workers 1 &
