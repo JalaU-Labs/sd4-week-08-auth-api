@@ -32,7 +32,32 @@ _To be completed in later steps._
 
 ## Docker
 
-_To be completed in later steps._
+The production image runs the FastAPI application, Casdoor, and Caddy together. Run the production Compose file explicitly to avoid merging the development override:
+
+```sh
+docker compose -f docker-compose.yml up --build -d
+docker compose -f docker-compose.yml ps
+docker compose -f docker-compose.yml logs -f api
+```
+
+The service is available at `http://localhost:8080`. FastAPI's Swagger UI is at `/docs`, Casdoor is at `/casdoor/`, and the API health endpoints are `/health` and `/ready`. The production health check monitors `/health`.
+
+Stop the production stack with:
+
+```sh
+docker compose -f docker-compose.yml down
+```
+
+For development, the default Compose command automatically merges `docker-compose.override.yml`. It bind-mounts `src/` and enables Uvicorn hot reload on port `8080`:
+
+```sh
+docker compose up --build -d
+docker compose logs -f api
+```
+
+This development service runs the API directly and does not start Caddy or Casdoor. Stop it with `docker compose down`.
+
+Casdoor's initial admin password must be supplied as a runtime secret before initial setup. The repository configuration intentionally leaves it unset; do not commit credentials.
 
 ## CI/CD
 
